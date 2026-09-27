@@ -152,7 +152,7 @@ a.btnlink:hover{border-color:var(--ink)}
       <span class="hint" style="margin:0">Section through the middle of the chosen side, true to scale. Upper-tier fronts show the guard.</span>
     </div>
     <div class="planhead"><h3 id="planTitle">Plan</h3>
-      <div class="seg" id="planTabs" role="group" aria-label="Plan view"><button data-plan="field" aria-pressed="true" class="on">Field layout</button><button data-plan="bowl" aria-pressed="false">Bowl plan</button></div></div>
+      <div class="seg" id="planTabs" role="group" aria-label="Plan view"><button data-plan="field" aria-pressed="false">Field layout</button><button data-plan="bowl" aria-pressed="true" class="on">Bowl plan</button></div></div>
     <div class="panel" id="plan"></div>
     <p class="hint" id="planNote"></p>
     <div class="planhead"><h3 class="opthead" style="margin:0">Saved options</h3><div class="seg"><button id="bkOpt">Back up options</button><button id="rsOpt">Restore options</button><input type="file" id="rsFile" accept=".json,application/json" hidden></div></div><div class="opts" id="opts"></div>
@@ -242,7 +242,7 @@ function Pen(k){
     a:(cx,cy,r,a0,a1,o={})=>`<path d="${P.arcD(cx,cy,r,a0,a1)}" ${st(o)}/>`,
     path:(d,o={})=>`<path d="${d}" ${st(o)}/>`,
     poly:(pts,o={},close=true)=>`<path d="M${pts.map(p=>f(p[0])+' '+f(p[1])).join('L')}${close?'Z':''}" ${st(o)}/>`,
-    t:(x,y,s,size,o={})=>`<text x="${f(x)}" y="${f(y)}" font-size="${f(size)}" text-anchor="${o.anchor||'middle'}" fill="${o.c||'var(--mark)'}" font-weight="${o.wt||700}"${o.base?` dominant-baseline="${o.base}"`:''}${o.rot?` transform="rotate(${o.rot} ${f(x)} ${f(y)})"`:''}${o.op!=null?` opacity="${o.op}"`:''}>${s}</text>`
+    t:(x,y,s,size,o={})=>`<text x="${f(x)}" y="${f(y)}" font-size="${f(size)}" text-anchor="${o.anchor||'middle'}" fill="${o.c||'var(--mark)'}" font-weight="${o.wt||700}"${o.base?` dominant-baseline="${o.base}"`:''}${(o.rot||o.base==='middle')&&(o.rot||PLANROT)?` transform="rotate(${o.base==='middle'?upright(o.rot||0):o.rot} ${f(x)} ${f(y)})"`:''}${o.op!=null?` opacity="${o.op}"`:''}>${s}</text>`
   };
   return P;
 }
@@ -255,13 +255,19 @@ function gridiron(o){
     const a=P.L/2,b=P.W/2,gl=a-10*YD,hy=b-o.hash;let s='';
     s+=g.fill(-a-15,-b-15,a+15,b+15,'var(--grass2)');
     s+=g.fill(-a,-b,a,b,'var(--pitch)')+g.fill(-a,-b,-gl,b,'var(--pitch-dk)')+g.fill(gl,-b,a,b,'var(--pitch-dk)');
-    if(o.nfl){ // 6 ft solid white border, broken yellow limit line 6 ft beyond, bench areas between the 30-yard lines
+    if(o.nfl){ // NFL Rule 1 field markings (2026)
+      // 6 ft solid white border; broken yellow limit line 9'-4" beyond it along the sidelines and 6 ft beyond it behind the end
+      // zones; from each 25-yard line it angles back to pass 6 ft behind the benches (benches at least 30'-4" back).
+      const yL=6*FT+9*FT+4*IN,yB=30*FT+4*IN+6*FT,xE=a+12*FT,x25=25*YD,x30=20*YD;
       s+=`<path d="M${-a-6*FT} ${-b-6*FT}H${a+6*FT}V${b+6*FT}H${-a-6*FT}ZM${-a} ${-b}V${b}H${a}V${-b}Z" fill="var(--mark)" fill-rule="evenodd"/>`;
-      s+=mirror(sg=>{const y1=sg*(b+12*FT),y2=sg*(b+42*FT);
-        return g.poly([[-a-12*FT,y1],[-25*YD,y1],[-20*YD,y2],[20*YD,y2],[25*YD,y1],[a+12*FT,y1]],{c:COL_LIMIT,w:1,d:[2*FT,1*FT]},false)
-          +g.l(-20*YD,y1,20*YD,y1,{c:COL_LIMIT,w:1.4})+g.t(0,sg*(b+29*FT),'TEAM AREA',1.3,{c:COL_LIMIT,base:'middle',wt:650});});
-      s+=mirror(sg=>g.l(sg*(a+12*FT),-b-12*FT,sg*(a+12*FT),b+12*FT,{c:COL_LIMIT,w:1,d:[2*FT,1*FT]}));
-    }else{ // NCAA: limit line 12 ft, coaching line 6 ft, team area between the 20-yard lines
+      s+=mirror(sg=>{const y1=sg*(b+yL),y2=sg*(b+yB),yc=sg*(b+12*FT),yw=sg*(b+yL-3*FT);
+        return g.poly([[-xE,y1],[-x25,y1],[-x30,y2],[x30,y2],[x25,y1],[xE,y1]],{c:COL_LIMIT,w:1.4,d:[2*FT,1*FT]},false)
+          +g.l(-x25,yc,x25,yc,{c:COL_LIMIT,w:1.4})                                               // coaches' line, 6 ft behind the border
+          +g.l(-xE,yw,-x25,yw,{w:.8,d:[4*FT,2*FT]})+g.l(x25,yw,xE,yw,{w:.8,d:[4*FT,2*FT]})        // broken white line, 3 ft inside the yellow
+          +g.l(-x30,sg*(b+30*FT+4*IN),x30,sg*(b+30*FT+4*IN),{c:'var(--muted)',w:.8,d:[1*FT,1*FT]})    // bench line
+          +g.t(0,sg*(b+21*FT),'TEAM AREA',1.3,{c:COL_LIMIT,base:'middle',wt:650});});
+      s+=mirror(sg=>g.l(sg*xE,-b-yL,sg*xE,b+yL,{c:COL_LIMIT,w:1.4,d:[2*FT,1*FT]}));
+    }else{ // NCAA Rule 1-2: limit line 12 ft (12 in dashes at 24 in intervals), coaching line 6 ft, team area
       s+=mirror(sg=>{const y6=sg*(b+6*FT),y12=sg*(b+12*FT),y36=sg*(b+36*FT),y42=sg*(b+42*FT),x=30*YD;
         let h=g.poly([[-a-12*FT,y12],[-x-6*FT,y12],[-x-6*FT,y42],[x+6*FT,y42],[x+6*FT,y12],[a+12*FT,y12]],{c:COL_LIMIT,w:1,d:[1*FT,2*FT]},false)
           +g.r(-x,y12,x,y36,{c:COL_LIMIT,w:1.2})+g.l(-x,y6,x,y6,{w:1.3});
@@ -274,8 +280,20 @@ function gridiron(o){
     for(let n=1;n<100;n++){if(n%5===0)continue;const x=-gl+n*YD;
       s+=g.l(x,-b+8*IN,x,-b+8*IN+2*FT,{w:.8})+g.l(x,b-8*IN,x,b-8*IN-2*FT,{w:.8})+g.l(x,-hy,x,-hy-2*FT,{w:.8})+g.l(x,hy,x,hy+2*FT,{w:.8});}
     s+=mirror(sg=>g.l(sg*(gl-o.tryYd*YD),-YD/2,sg*(gl-o.tryYd*YD),YD/2,{w:1}));
-    const fs=6*FT/0.72,base=o.nfl?b-12*YD:b-9*YD+6*FT;
-    for(let n=10;n<=90;n+=10){const x=-gl+n*YD,lab=n<=50?n:100-n;s+=g.t(x,base,lab,fs,{op:.92})+g.t(x,-base,lab,fs,{rot:180,op:.92});}
+    // Yard numbers: digits 6 ft high x 4 ft wide, one each side of the yard line. NFL: bottom edge 12 yd from the sideline;
+    // NCAA: top edge 9 yd from the sideline. Arrow (not on the 50): 36 in long sides, 18 in crossfield side starting 15 in below
+    // the top of the number and 6 in goalward of it, pointing to the nearer goal line (NFL Field Markings item 9).
+    const nH=6*FT,nW=4*FT,nGap=1*FT,fs=nH/0.72,yTop=o.nfl?b-12*YD-nH:b-9*YD,ah=Math.sqrt(36*36-9*9)*IN;
+    const digit=(x,y,ch,rot)=>`<text x="${g.f(x)}" y="${g.f(y)}" font-size="${g.f(fs)}" text-anchor="middle" fill="var(--mark)" font-weight="700" opacity=".92" textLength="${g.f(nW)}" lengthAdjust="spacingAndGlyphs"${rot?` transform="rotate(180 ${g.f(x)} ${g.f(y)})"`:''}>${ch}</text>`;
+    for(let n=10;n<=90;n+=10){const x=-gl+n*YD,lab=String(n<=50?n:100-n),dl=x-nGap-nW/2,dr=x+nGap+nW/2,yb=yTop+nH;
+      s+=digit(dl,yb,lab[0])+digit(dr,yb,lab[1])+digit(dr,-yb,lab[0],1)+digit(dl,-yb,lab[1],1);
+      if(n===50)continue;
+      const dir=n<50?-1:1,xb=x+dir*(nGap+nW+6*IN),xa=xb+dir*ah;
+      for(const sg of[1,-1]){const y0=sg*(yTop+15*IN),y1=sg*(yTop+33*IN),ym=(y0+y1)/2;
+        s+=`<path d="M${g.f(xb)} ${g.f(y0)}L${g.f(xa)} ${g.f(ym)}L${g.f(xb)} ${g.f(y1)}Z" fill="var(--mark)" opacity=".92"/>`;}}
+    // pylons at the inside corners of each end zone (goal line and end line with the sidelines)
+    for(const xx of[-a,-gl,gl,a])for(const yy of[-b,b]){const px=xx+(Math.abs(xx)>gl+1e-6?Math.sign(-xx):Math.sign(xx))*0.2,py=yy-Math.sign(yy)*0.2;
+      s+=`<rect x="${g.f(px-0.2)}" y="${g.f(py-0.2)}" width="0.4" height="0.4" fill="#FF6A13"/>`;}
     s+=mirror(sg=>g.l(sg*a,-9.25*FT,sg*a,9.25*FT,{c:COL_POST,w:3})+g.l(sg*a,0,sg*(a+6*FT),0,{c:COL_POST,w:3}));
     return s;
   },
@@ -283,7 +301,8 @@ function gridiron(o){
     return [{p:[-a,-b],q:[a,-b],off:22},{p:[-a,-b],q:[-gl,-b],off:18},{p:[-gl,-b],q:[gl,-b],off:18},{p:[gl,-b],q:[a,-b],off:18},
       {p:[a,-b],q:[a,b],off:19},{p:[xh,-b],q:[xh,-hy],off:0,note:'to hash'},{p:[-xh,-hy],q:[-xh,hy],off:0,note:'hash to hash'},
       {p:[xn,b-numD],q:[xn,b],off:0,note:o.nfl?'sideline to bottom of numbers':'sideline to top of numbers'},
-      {p:[a,b-4],q:[a+12*FT,b-4],off:0,note:'limit line'},{p:[a,-9.25*FT],q:[a,9.25*FT],off:4,note:'goal posts'}];}
+      {p:[a,b-4],q:[a+12*FT,b-4],off:0,note:'limit line'},{p:[-gl+45*YD,b],q:[-gl+45*YD,b+(o.nfl?6*FT+9*FT+4*IN:12*FT)],off:0,note:o.nfl?'sideline to limit line':'limit line'},
+      {p:[a,-9.25*FT],q:[a,9.25*FT],off:4,note:'goal posts'}];}
   };
 }
 
@@ -541,11 +560,11 @@ const LEGACY_SPORT={football:'fifa',rugby:'rugbyu',gridiron:'nfl',athletics:'usa
 // ---------- dimension strings (architectural ticks, text in the selected unit format) ----------
 // Label placement shared by drawing and extents: value on one line, description on a second line away from the dimension.
 function dimLabel(d,fs){
-  if(d.r){const t=d.ang*Math.PI/180;let rot=d.ang;while(rot>90)rot-=180;while(rot<=-90)rot+=180;
+  if(d.r){const t=d.ang*Math.PI/180;let rot=upright(d.ang);
     const lab='R '+L(d.r*1000);return {r:true,t,mx:d.c[0]+d.r*.55*Math.cos(t)-Math.sin(t)*fs*.7,my:d.c[1]+d.r*.55*Math.sin(t)+Math.cos(t)*fs*.7,rot,lab,note:d.note,below:true,tw:lab.length*.58*fs};}
   const [x1,y1]=d.p,[x2,y2]=d.q,dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy)||1e-9,ux=dx/len,uy=dy/len,nx=uy,ny=-ux,o=d.off||0,sg=o>=0?1:-1;
   const a=[x1+nx*o,y1+ny*o],b=[x2+nx*o,y2+ny*o],lab=L(len*1000),tw=Math.max(lab.length*.58,d.note?(d.note.length*.8*.52):0)*fs;
-  let rot=Math.atan2(uy,ux)*180/Math.PI;if(rot>90)rot-=180;if(rot<=-90)rot+=180;
+  let rot=upright(Math.atan2(uy,ux)*180/Math.PI);
   const side=o?sg:1,ox=nx*fs*.75*side,oy=ny*fs*.75*side;
   let mx=(a[0]+b[0])/2+ox,my=(a[1]+b[1])/2+oy;
   if(tw>len*.98){const out=Math.hypot(x2,y2)>=Math.hypot(x1,y1),e=out?b:a,dir=out?1:-1,push=tw/2+fs*.7;mx=e[0]+ux*push*dir+ox;my=e[1]+uy*push*dir+oy;}
@@ -587,7 +606,7 @@ function groupName(P,ti,g){if(!zoned(P))return 'All around';if(g.length===4)retu
 function zp(o){return Object.assign({on:true,rows:20,seat:'standard',riser:'parabolic',tread:34*25.4,tread0:36*25.4,treadN:36*25.4,seatW:20*25.4,target:2.5*25.4,D:30*0.3048,Z:5*0.3048,X:null,gap:2.4,rise:3.048,suites:0},o);}
 function tierDef(rows,link,o={}){return {link,corners:'auto',z:Object.fromEntries(GEO.map(k=>[k,zp(Object.assign({rows},o))]))};}
 function defaults(){const S=SPORTS.ncaafb,f={};
-  return {sport:'ncaafb',L:S.L,W:S.W,lanes:8,fl:330*FT,cf:400*FT,bs:60*FT,north:'T',sec:'T',tierCount:2,
+  return {sport:'ncaafb',L:S.L,W:S.W,lanes:8,fl:330*FT,cf:400*FT,bs:60*FT,north:'L',sec:'T',tierCount:2,
   zt:[tierDef(22,'all',f),tierDef(18,'pairs',f),tierDef(14,'pairs',f)],
   eyeH:1200,setback:400,slabT:6*25.4,step:12.7,maxRiser:24*25.4,bank:1,maxRake:34,loss:12,vd:S.vd,capTarget:30000,railH:660,minHead:2300,suiteH:4.27};}
 function defaultsPinned(){const d=defaults();pinUpperTiers(d);return d;}
@@ -803,12 +822,12 @@ function buildDAE(P,ZR,CH){
   return `<?xml version="1.0" encoding="utf-8"?>\n<COLLADA xmlns="http://www.collada.org/2005/11/COLLADASchema" version="1.4.1"><asset><unit name="meter" meter="1"/><up_axis>Z_UP</up_axis></asset><library_effects>${fx('concrete','0.74 0.75 0.73')}${fx('pitch','0.33 0.55 0.27')}</library_effects><library_materials><material id="concrete" name="Concrete"><instance_effect url="#concrete-fx"/></material><material id="pitch" name="Pitch"><instance_effect url="#pitch-fx"/></material></library_materials><library_geometries>${geos.join('')}</library_geometries><library_visual_scenes><visual_scene id="Scene">${nodes.join('')}</visual_scene></library_visual_scenes><scene><instance_visual_scene url="#Scene"/></scene></COLLADA>`;
 }
 /*ENDCORE*/
-const VERSION='2026.09.27.9';
+const VERSION='2026.09.27.10';
 const KEY='sightline-v2';
 let P, OPTS=[], CUR=null, ROWS=[], M=null, DL=null;
 try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&s.P){P=fixP(Object.assign(defaults(),migrate(s.P)));OPTS=s.OPTS||[];}}catch(e){}
 // When the defaults change (DREV goes up), each browser starts once from the new default bowl; saved options are kept.
-const DREV=4;let NEWDEF=false;
+const DREV=5;let NEWDEF=false;
 try{if((+localStorage.getItem('sightline-defaults-rev')||0)<DREV){NEWDEF=!!P;P=null;localStorage.setItem('sightline-defaults-rev',String(DREV));localStorage.setItem('sightline-units',JSON.stringify({sys:'imperial',metric:'mm',imperial:'ftin-frac'}));}}catch(e){}
 if(!P)P=defaultsPinned();
 const $=id=>document.getElementById(id);
@@ -929,7 +948,7 @@ function zoneEditor(ti,g){
 function renderControls(){
   const grp=(r,lab)=>`<optgroup label="${lab}">`+Object.entries(SPORTS).filter(([k,x])=>x.region===r).map(([k,x])=>`<option value="${k}"${P.sport===k?' selected':''}>${x.name} (${x.org})</option>`).join('')+'</optgroup>';
   let h='<h2>Sport</h2><select id="sportSel" class="sel" aria-label="Sport and governing body">'+grp('america','America')+grp('world','World')+'</select>';
-  if(zoned(P))h+=`<div class="sl"><div class="sl-top"><label for="northSel">North is the</label></div><select id="northSel" class="sel">${[['L','Left end'],['R','Right end'],['T','Top sideline'],['B','Bottom sideline']].map(([k,n])=>`<option value="${k}"${P.north===k?' selected':''}>${n} of the plan</option>`).join('')}</select></div>`;
+  if(zoned(P))h+=`<div class="sl"><div class="sl-top"><label for="northSel">Field orientation (plan is north up)</label></div><select id="northSel" class="sel">${[['L','North–South, end zones N and S'],['R','North–South, flipped'],['T','East–West, end zones E and W'],['B','East–West, flipped']].map(([k,n])=>`<option value="${k}"${P.north===k?' selected':''}>${n}</option>`).join('')}</select></div>`;
   h+='<h2>Capacity target</h2>'+slider('capTarget','Target seats',5000,120000,500,'seats')+'<button id="fit" style="margin-top:6px">Size rows to hit target</button>';
   h+='<h2>Tiers</h2><div class="seg">'+[1,2,3].map(n=>`<button data-tc="${n}" class="${P.tierCount===n?'on':''}">${n} tier${n>1?'s':''}</button>`).join('')+'</div>';
   h+='<div class="lab">Tread and riser thickness</div><div class="seg">'+[4,5,6].map(n=>`<button data-slab="${n}" class="${Math.abs(slabT()-n*25.4)<0.1?'on':''}">${L(n*25.4)}</button>`).join('')+'</div>';
@@ -1050,7 +1069,11 @@ function chainDims(rows,tiers,X,Y,fs,band){
     s+=`<text x="${f(xl)}" y="${f(ym)}" font-size="${f(fs*.62)}" fill="${c}" font-weight="650" text-anchor="middle" transform="rotate(-90 ${f(xl)} ${f(ym)})">${L(vp[i].z-vp[i-1].z)}</text>`;}
   return s;
 }
-let PLAN='field';
+let PLAN='bowl',PLANROT=0;
+// The plan is always drawn north up: rotate the drawing so the side facing north sits at the top.
+const planRot=()=>zoned(P)?({T:0,R:-90,B:180,L:90})[P.north]||0:0;
+const rotPt=(x,y,t)=>{const r=t*Math.PI/180,c=Math.round(Math.cos(r)),s=Math.round(Math.sin(r));return [x*c-y*s,x*s+y*c];};
+const upright=r=>{let x=r+PLANROT;while(x>=90)x-=180;while(x<-90)x+=180;return x-PLANROT;};   // vertical text reads bottom to top   // text angle that reads upright after rotation
 const FOCAL='#D0021B';
 // Dimensions of the point-of-focus boundary only: the line every sightline and front-row distance is measured from.
 function focalDims(P){
@@ -1075,6 +1098,7 @@ function bufferFill(){if(PLAN!=='bowl')return '';
   const x0=s.L.p[0]-d('L'),x1=s.R.p[0]+d('R'),y0=s.T.p[1]-d('T'),y1=s.B.p[1]+d('B');
   return `<rect x="${x0.toFixed(2)}" y="${y0.toFixed(2)}" width="${(x1-x0).toFixed(2)}" height="${(y1-y0).toFixed(2)}" fill="var(--grass2)"/>`;}
 function drawPlan(){
+  PLANROT=planRot();
   const S=SPORTS[P.sport],bnd=boundary(P),st=stations(bnd),xs=bnd.map(p=>p[0]),ys=bnd.map(p=>p[1]);
   let x0=Math.min(...xs)-S.pad,x1=Math.max(...xs)+S.pad,y0=Math.min(...ys)-S.pad,y1=Math.max(...ys)+S.pad;
   const grow=(x,y,m=0)=>{x0=Math.min(x0,x-m);x1=Math.max(x1,x+m);y0=Math.min(y0,y-m);y1=Math.max(y1,y+m);};
@@ -1095,15 +1119,22 @@ function drawPlan(){
     for(const d of dims){const D=dimLabel(d,fs);if(d.r)grow(d.c[0],d.c[1]);else{grow(D.a[0],D.a[1],fs);grow(D.b[0],D.b[1],fs);}
       const R=D.rot*Math.PI/180,hx=Math.abs(Math.cos(R))*D.tw*.65+Math.abs(Math.sin(R))*fs*2+fs*.4,hy=Math.abs(Math.sin(R))*D.tw*.65+Math.abs(Math.cos(R))*fs*2+fs*.4;
       grow(D.mx-hx,D.my-hy);grow(D.mx+hx,D.my+hy);}}
-  const W=x1-x0,H=y1-y0,g=Pen(W/900);
-  let s=`<svg viewBox="${x0.toFixed(2)} ${y0.toFixed(2)} ${W.toFixed(2)} ${H.toFixed(2)}" role="img" aria-label="${S.org} ${S.name} ${PLAN==='field'?'field layout':'bowl plan'}">`;
-  s+=bufferFill()+S.draw(P,g)+rings+`<path d="${ptsPath(bnd)}" fill="none" stroke="${FOCAL}" stroke-width="${(3.4*g.k).toFixed(3)}" stroke-linejoin="round"/>`;
+  const W=x1-x0,H=y1-y0,g=Pen(W/900),t=PLANROT;
+  // drawing rotated north up; view box = the rotated extents; labels drawn upright at their rotated positions
+  const cs=[[x0,y0],[x1,y0],[x1,y1],[x0,y1]].map(([x,y])=>rotPt(x,y,t)),vx0=Math.min(...cs.map(c=>c[0])),vy0=Math.min(...cs.map(c=>c[1])),
+    vW=Math.max(...cs.map(c=>c[0]))-vx0,vH=Math.max(...cs.map(c=>c[1]))-vy0;
+  let s=`<svg viewBox="${vx0.toFixed(2)} ${vy0.toFixed(2)} ${vW.toFixed(2)} ${vH.toFixed(2)}" role="img" aria-label="${S.org} ${S.name} ${PLAN==='field'?'field layout':'bowl plan'}, north up">`;
+  let body=bufferFill()+S.draw(P,g)+rings+`<path d="${ptsPath(bnd)}" fill="none" stroke="${FOCAL}" stroke-width="${(3.4*g.k).toFixed(3)}" stroke-linejoin="round"/>`,over='';
   if(PLAN==='bowl'){const sec=sectionAt(),ex=sec[0]+sec[2]*(Rmax+1.5),ey=sec[1]+sec[3]*(Rmax+1.5),lf=W/45;
-    s+=labels.map(([x,y,t])=>`<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-size="${(lf*1.1).toFixed(2)}" font-weight="700" fill="var(--ink)" text-anchor="middle" dominant-baseline="middle">${t}</text>`).join('');
-    s+=`<line x1="${sec[0].toFixed(2)}" y1="${sec[1].toFixed(2)}" x2="${ex.toFixed(2)}" y2="${ey.toFixed(2)}" stroke="var(--accent)" stroke-width="2.5" stroke-dasharray="6 4" vector-effect="non-scaling-stroke"/>`
-      +`<text x="${(ex+sec[2]*lf*.9).toFixed(2)}" y="${(ey+sec[3]*lf*.9+(zoned(P)&&isSide(P.sec)?0:lf*1.4)).toFixed(2)}" font-size="${lf.toFixed(2)}" fill="var(--accent)" font-weight="650" text-anchor="middle" dominant-baseline="middle" paint-order="stroke" stroke="var(--panel)" stroke-width="${(W/150).toFixed(2)}">Section</text>`;}
-  else s+=drawDims(dims,g,fs);
-  return s+'</svg>';
+    over+=labels.map(([x,y,tx])=>{const [rx,ry]=rotPt(x,y,t);return `<text x="${rx.toFixed(2)}" y="${ry.toFixed(2)}" font-size="${(lf*1.1).toFixed(2)}" font-weight="700" fill="var(--ink)" text-anchor="middle" dominant-baseline="middle">${tx}</text>`;}).join('');
+    body+=`<line x1="${sec[0].toFixed(2)}" y1="${sec[1].toFixed(2)}" x2="${ex.toFixed(2)}" y2="${ey.toFixed(2)}" stroke="var(--accent)" stroke-width="2.5" stroke-dasharray="6 4" vector-effect="non-scaling-stroke"/>`;
+    const [nx,ny]=rotPt(sec[2],sec[3],t),[rx,ry]=rotPt(ex,ey,t),side=Math.abs(nx)<0.5;          // marker points up/down: label beyond its end
+    over+=`<text x="${(rx+(side?nx*lf*.9:-nx*lf*2.2)).toFixed(2)}" y="${(ry+(side?ny*lf*.9:-lf*.9)).toFixed(2)}" font-size="${lf.toFixed(2)}" fill="var(--accent)" font-weight="650" text-anchor="middle" dominant-baseline="middle" paint-order="stroke" stroke="var(--panel)" stroke-width="${(W/150).toFixed(2)}">Section</text>`;
+    // north arrow
+    const na=lf*1.6,nxp=vx0+vW-na*1.2,nyp=vy0+na*1.3;
+    over+=`<path d="M${nxp.toFixed(2)} ${(nyp-na*.9).toFixed(2)}L${(nxp+na*.4).toFixed(2)} ${(nyp+na*.5).toFixed(2)}L${nxp.toFixed(2)} ${(nyp+na*.2).toFixed(2)}L${(nxp-na*.4).toFixed(2)} ${(nyp+na*.5).toFixed(2)}Z" fill="var(--ink)"/><text x="${nxp.toFixed(2)}" y="${(nyp+na*1.2).toFixed(2)}" font-size="${(lf*.9).toFixed(2)}" font-weight="700" fill="var(--ink)" text-anchor="middle" dominant-baseline="middle">N</text>`;}
+  else body+=drawDims(dims,g,fs);
+  return s+(t?`<g transform="rotate(${t})">${body}</g>`:body)+over+'</svg>';
 }
 $('planTabs').addEventListener('click',e=>{const b=e.target.closest('[data-plan]');if(!b)return;PLAN=b.dataset.plan;
   document.querySelectorAll('#planTabs [data-plan]').forEach(x=>{const on=x===b;x.classList.toggle('on',on);x.setAttribute('aria-pressed',on);});
